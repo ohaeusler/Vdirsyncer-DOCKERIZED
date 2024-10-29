@@ -169,76 +169,33 @@ else
     POST_SYNC_SNIPPET=" ${POST_SYNC_SCRIPT_FILE} || echo 'Error during Script'"
 fi
 
-### Set up Cronjobs ###
-# Append to crontab file if autodiscover and autosync are true
-if [[ "${AUTODISCOVER}" == "true" ]] && [[ "${AUTOSYNC}" == "true" ]]
-then
-    # Write cronjob to file
+# Set up Cronjobs
+# Write cronjob to file
+{
     echo "${CRON_TIME} yes | /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} discover \
     && /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} metasync \
-    && /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} sync --force-delete tum ${POST_SYNC_SNIPPET}" > "${CRON_FILE}"
+    && /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} sync ${POST_SYNC_SNIPPET} \
+    && if 2>&1 | grep -q 'Storage .* was completely emptied'; then \
+        echo 'Storage was completely emptied. Resetting vdirsyncer status and retrying sync.' | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"; \
+        rm -f ~/.vdirsyncer/status/*; \
+        /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} discover; \
+        /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} metasync; \
+        /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} sync; \
+    fi" > "${CRON_FILE}"
 
-    # User info
-    echo 'Autodiscover and Autosync are enabled.' 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
+    echo 'Autodiscover and Autosync are enabled.'
+} 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
 
-    # Check if LOG_LEVEL environment variable is empty
-    if [[ -z "${LOG_LEVEL}" ]]
-    then
-        # Start the cronjob
-        /usr/bin/supercronic "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-
-    # If LOG_LEVEL environment variable is set
-    else
-        # Start the cronjob
-        /usr/bin/supercronic "${LOG_LEVEL}" "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-    fi
-
-# Append to crontab file if autosync is true
-elif [[ "${AUTODISCOVER}" == "false" ]] && [[ "${AUTOSYNC}" == "true" ]]
+# Check if LOG_LEVEL environment variable is empty
+if [[ -z "${LOG_LEVEL}" ]]
 then
-    # Write cronjob to file
-    echo "${CRON_TIME} /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} metasync \
-    && /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} sync --force-delete tum ${POST_SYNC_SNIPPET}" > "${CRON_FILE}"
+    # Start the cronjob
+    /usr/bin/supercronic "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
 
-    # User info
-    echo 'Only Autosync is enabled.' 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-
-    # Check if LOG_LEVEL environment variable is empty
-    if [[ -z "${LOG_LEVEL}" ]]
-    then
-        # Start the cronjob
-        /usr/bin/supercronic "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-
-    # If LOG_LEVEL environment variable is set
-    else
-        # Start the cronjob
-        /usr/bin/supercronic "${LOG_LEVEL}" "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-    fi
-
-# Append to crontab file if autodiscover is true
-elif [[ "${AUTODISCOVER}" == "true" ]] && [[ "${AUTOSYNC}" == "false" ]]
-then
-    # Write cronjob to file
-    echo "${CRON_TIME} yes | /usr/local/bin/vdirsyncer -c ${VDIRSYNCER_CONFIG} discover ${POST_SYNC_SNIPPET}" > "${CRON_FILE}"
-
-    # User info
-    echo 'Only Autodiscover is enabled.' 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-
-    # Check if LOG_LEVEL environment variable is empty
-    if [[ -z "${LOG_LEVEL}" ]]
-    then
-        # Start the cronjob
-        /usr/bin/supercronic "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-
-    # If LOG_LEVEL environment variable is set
-    else
-        # Start the cronjob
-        /usr/bin/supercronic "${LOG_LEVEL}" "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
-    fi
-
-# Append nothing, if both options are disabled
+# If LOG_LEVEL environment variable is set
 else
-    echo 'Autodiscover and Autosync are disabled.' 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
+    # Start the cronjob
+    /usr/bin/supercronic "${LOG_LEVEL}" "${CRON_FILE}" 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee -a "${LOG}"
 fi
 
 # Run Container
